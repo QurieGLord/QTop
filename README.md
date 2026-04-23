@@ -1,9 +1,17 @@
-# 🖥️ QTop
+<p align="center">
+  <img src="demo.png" alt="QTop Demo">
+</p>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/QurieGLord/QTop)](https://goreportcard.com/report/github.com/QurieGLord/QTop)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<h1 align="center">🖥️ QTop</h1>
 
-**QTop** is a modern, responsive, and terminal-native system monitor written in Go. Inspired by the aesthetics of `btop` and the r/CLI community, it provides a clean and focused way to monitor your system resources without the clutter.
+<p align="center">
+  <a href="https://goreportcard.com/report/github.com/QurieGLord/QTop"><img src="https://goreportcard.com/badge/github.com/QurieGLord/QTop" alt="Go Report Card"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center">
+  <strong>QTop</strong> is a modern, responsive, and terminal-native system monitor written in Go. Inspired by the aesthetics of <code>btop</code> and the r/CLI community, it provides a clean and focused way to monitor your system resources without the clutter.
+</p>
 
 ---
 

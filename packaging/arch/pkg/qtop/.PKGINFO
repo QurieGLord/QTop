@@ -6,7 +6,7 @@ xdata = pkgtype=pkg
 pkgver = 1.0.0-1
 pkgdesc = A modern, responsive TUI system monitor written in Go
 url = https://github.com/QurieGLord/QTop
-builddate = 1776906034
+builddate = 1776907056
 packager = Unknown Packager
 size = 3721216
 arch = x86_64
