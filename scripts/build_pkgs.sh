@@ -1,5 +1,5 @@
 #!/bin/bash
-# QTop Package Builder Script
+# QTop Package Builder & Installer Script
 set -e
 
 VERSION="1.0.0"
@@ -12,6 +12,12 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 mkdir -p "$DIST_DIR"
+
+# Переменные для отслеживания того, что было собрано
+BUILT_ARCH=false
+BUILT_DEB=false
+BUILT_RPM=false
+INSTALL_AFTER_BUILD=false
 
 check_go() {
     if ! command -v go &> /dev/null; then
@@ -28,12 +34,12 @@ build_binary() {
 build_arch() {
     echo -e "${GREEN}==> Building Arch Linux package...${NC}"
     cd "$PROJECT_ROOT/packaging/arch"
-    # Очистка старых билдов
     rm -rf src pkg qtop-*.pkg.tar.zst
     makepkg -f
     mv qtop-*.pkg.tar.zst "$DIST_DIR/"
     echo -e "${GREEN}==> Arch package saved to dist/${NC}"
     cd "$PROJECT_ROOT"
+    BUILT_ARCH=true
 }
 
 build_debian() {
@@ -53,6 +59,7 @@ build_debian() {
     dpkg-deb --build "$BUILD_DIR" "$DIST_DIR/qtop_${VERSION}_amd64.deb"
     rm -rf "$BUILD_DIR"
     echo -e "${GREEN}==> Debian package saved to dist/${NC}"
+    BUILT_DEB=true
 }
 
 build_rpm() {
@@ -72,16 +79,39 @@ build_rpm() {
     find "$BUILD_DIR/RPMS" -name "*.rpm" -exec cp {} "$DIST_DIR/" \;
     rm -rf "$BUILD_DIR"
     echo -e "${GREEN}==> RPM package saved to dist/${NC}"
+    BUILT_RPM=true
+}
+
+install_packages() {
+    if [ "$BUILT_ARCH" = true ]; then
+        echo -e "${GREEN}==> Installing Arch package...${NC}"
+        sudo pacman -U --noconfirm "$DIST_DIR"/qtop-"$VERSION"-*.pkg.tar.zst
+    fi
+
+    if [ "$BUILT_DEB" = true ]; then
+        echo -e "${GREEN}==> Installing Debian package...${NC}"
+        sudo dpkg -i "$DIST_DIR/qtop_${VERSION}_amd64.deb"
+    fi
+
+    if [ "$BUILT_RPM" = true ]; then
+        echo -e "${GREEN}==> Installing RPM package...${NC}"
+        if command -v dnf &> /dev/null; then
+            sudo dnf install -y "$DIST_DIR"/qtop-"$VERSION"-*.rpm
+        else
+            sudo rpm -i "$DIST_DIR"/qtop-"$VERSION"-*.rpm
+        fi
+    fi
 }
 
 usage() {
-    echo "Usage: $0 [-a] [-d] [-r] [-s]"
-    echo "  -a: Build Arch Linux package (using makepkg)"
-    echo "  -d: Build Debian package (using dpkg-deb)"
-    echo "  -r: Build RPM package (using rpmbuild)"
-    echo "  -s: Build from source (just binary)"
+    echo "Usage: $0 [-a] [-d] [-r] [-s] [-i]"
+    echo "  -a: Build Arch Linux package"
+    echo "  -d: Build Debian package"
+    echo "  -r: Build RPM package"
+    echo "  -s: Build from source (binary only)"
+    echo "  -i: Install built packages (requires sudo)"
     echo ""
-    echo "Example: $0 -a -d"
+    echo "Example (build and install on Arch): $0 -a -i"
     exit 1
 }
 
@@ -89,13 +119,29 @@ if [ $# -eq 0 ]; then usage; fi
 
 check_go
 
-# Обработка флагов
-while getopts "adrs" opt; do
+# Сначала собираем аргументы
+while getopts "adrsi" opt; do
+    case "$opt" in
+        i) INSTALL_AFTER_BUILD=true ;;
+        a|d|r|s) ;; # Будем обрабатывать во втором проходе
+        *) usage ;;
+    esac
+done
+
+# Сбрасываем getopts для второго прохода сборки
+OPTIND=1
+while getopts "adrsi" opt; do
     case "$opt" in
         a) build_binary; build_arch ;;
         d) build_binary; build_debian ;;
         r) build_binary; build_rpm ;;
         s) build_binary; echo -e "${GREEN}==> Binary build complete: ./qtop${NC}" ;;
-        *) usage ;;
+        i) ;; # Уже обработано
     esac
 done
+
+# Выполняем установку, если был флаг -i
+if [ "$INSTALL_AFTER_BUILD" = true ]; then
+    install_packages
+    echo -e "${GREEN}==> QTop has been installed! You can now run 'qtop' from your terminal.${NC}"
+fi
