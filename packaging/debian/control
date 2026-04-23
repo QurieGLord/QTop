@@ -1,0 +1,10 @@
+Package: qtop
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: QurieGLord <https://github.com/QurieGLord/QTop>
+Depends: libc6
+Description: A modern, responsive TUI system monitor written in Go.
+ A clean, beautiful, and feature-rich TUI system monitor like btop.
+ Includes monitoring for CPU, GPU, Memory, ZRAM, Swaps and Processes.

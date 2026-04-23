@@ -1,0 +1,19 @@
+pkgname=qtop
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="A modern, responsive TUI system monitor written in Go"
+arch=('x86_64' 'aarch64')
+url="https://github.com/QurieGLord/QTop"
+license=('MIT')
+depends=('glibc')
+makedepends=('go')
+source=() # Local build
+
+build() {
+  cd "$srcdir/../../.." # Переходим в корень проекта из папки packaging/arch
+  go build -o qtop ./cmd/qtop
+}
+
+package() {
+  install -Dm755 "$srcdir/../../../qtop" "$pkgdir/usr/bin/qtop"
+}
