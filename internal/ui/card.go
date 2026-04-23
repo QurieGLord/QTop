@@ -14,6 +14,15 @@ const (
 	cardBorderH   = 2
 )
 
+type cardDensity int
+
+const (
+	cardDensityTiny cardDensity = iota
+	cardDensityCompact
+	cardDensityCozy
+	cardDensityFull
+)
+
 func cardContentSize(width, height int) (int, int) {
 	frameW := CardStyle.GetHorizontalFrameSize()
 	frameH := CardStyle.GetVerticalFrameSize()
@@ -25,7 +34,7 @@ func cardContentSize(width, height int) (int, int) {
 	return innerW, bodyH
 }
 
-func renderCard(width, height int, title string, focused bool, body string) string {
+func renderCard(width, height int, title string, state ComponentState, body string) string {
 	width = maxInt(1, width)
 	height = maxInt(1, height)
 
@@ -38,13 +47,10 @@ func renderCard(width, height int, title string, focused bool, body string) stri
 		return compact.Render(truncateTextWidth(strings.ToUpper(title), width))
 	}
 
-	style := CardStyle
-	if focused {
-		style = FocusedCardStyle
-	}
+	style := cardStyleForLevel(state.FocusLevel)
 
 	innerW, bodyH := cardContentSize(width, height)
-	titleLine := renderCardTitle(strings.ToUpper(title), innerW, focused)
+	titleLine := renderCardTitle(strings.ToUpper(title), innerW, state.FocusLevel)
 
 	bodyBlock := ""
 	if bodyH > 0 {
@@ -69,10 +75,17 @@ func renderCard(width, height int, title string, focused bool, body string) stri
 		Render(content)
 }
 
-func renderCardTitle(title string, width int, focused bool) string {
+func renderCardTitle(title string, width int, focusLevel float64) string {
 	style := CardTitleStyle
 	prefix := "○ "
-	if focused {
+	switch focusFrame(focusLevel) {
+	case 1:
+		style = SoftCardTitleStyle
+		prefix = "◔ "
+	case 2:
+		style = SoftCardTitleStyle
+		prefix = "◑ "
+	case 3:
 		style = FocusedCardTitleStyle
 		prefix = "● "
 	}
@@ -149,6 +162,54 @@ func Truncate(text string, width int) string {
 // Keycap renders a highlighted footer key label.
 func Keycap(label string) string {
 	return KeycapStyle.Render(label)
+}
+
+func focusFrame(level float64) int {
+	level = clamp01(level)
+	switch {
+	case level >= 0.85:
+		return 3
+	case level >= 0.5:
+		return 2
+	case level >= 0.2:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func cardStyleForLevel(level float64) lipgloss.Style {
+	switch focusFrame(level) {
+	case 1, 2:
+		return SoftCardStyle
+	case 3:
+		return FocusedCardStyle
+	default:
+		return CardStyle
+	}
+}
+
+func densityForCard(width, bodyH int) cardDensity {
+	switch {
+	case bodyH <= 1 || width < 18:
+		return cardDensityTiny
+	case bodyH <= 3 || width < 26:
+		return cardDensityCompact
+	case bodyH <= 6 || width < 36:
+		return cardDensityCozy
+	default:
+		return cardDensityFull
+	}
+}
+
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
 }
 
 func maxInt(values ...int) int {

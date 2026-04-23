@@ -19,7 +19,7 @@ type ProcessView struct {
 func (m ProcessView) Render() string {
 	innerW, bodyH := cardContentSize(m.Width, m.Height)
 	if bodyH <= 0 {
-		return renderCard(m.Width, m.Height, "Processes", m.Focused, "")
+		return renderCard(m.Width, m.Height, "Processes", m.ComponentState, "")
 	}
 
 	if innerW < 24 {
@@ -28,7 +28,7 @@ func (m ProcessView) Render() string {
 			p := m.Processes[i]
 			lines = append(lines, truncateTextWidth(fmt.Sprintf("%d %s", p.PID, p.Name), innerW))
 		}
-		return renderCard(m.Width, m.Height, "Processes", m.Focused, lipgloss.JoinVertical(lipgloss.Left, lines...))
+		return renderCard(m.Width, m.Height, "Processes", m.ComponentState, lipgloss.JoinVertical(lipgloss.Left, lines...))
 	}
 
 	prefixW := 2
@@ -74,7 +74,7 @@ func (m ProcessView) Render() string {
 		))
 	}
 
-	return renderCard(m.Width, m.Height, "Processes", m.Focused, lipgloss.JoinVertical(lipgloss.Left, rows...))
+	return renderCard(m.Width, m.Height, "Processes", m.ComponentState, lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 
 // ProcessVisibleRows returns the number of process rows that fit below the header.

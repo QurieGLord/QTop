@@ -16,12 +16,13 @@ type DiskView struct {
 // Render returns the string representation of the DiskView.
 func (m DiskView) Render() string {
 	innerW, bodyH := cardContentSize(m.Width, m.Height)
+	density := densityForCard(innerW, bodyH)
 	if bodyH <= 0 {
-		return renderCard(m.Width, m.Height, "Disks", m.Focused, "")
+		return renderCard(m.Width, m.Height, "Disks", m.ComponentState, "")
 	}
 
 	if len(m.Disks) == 0 {
-		return renderCard(m.Width, m.Height, "Disks", m.Focused, MutedStyle.Render("No mounted disks"))
+		return renderCard(m.Width, m.Height, "Disks", m.ComponentState, MutedStyle.Render("No mounted disks"))
 	}
 
 	rows := make([]string, 0, bodyH)
@@ -46,12 +47,12 @@ func (m DiskView) Render() string {
 			BoldStyle.Copy().Foreground(ColorText),
 		))
 
-		if len(rows) < bodyH {
+		if density >= cardDensityCompact && len(rows) < bodyH {
 			rows = append(rows, ProgressBar(innerW, disk.UsedPercent, GetColorByPercent(disk.UsedPercent)))
 		}
 	}
 
-	return renderCard(m.Width, m.Height, "Disks", m.Focused, lipgloss.JoinVertical(lipgloss.Left, rows...))
+	return renderCard(m.Width, m.Height, "Disks", m.ComponentState, lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
 
 // DiskHeight returns the panel height needed for the number of disks.

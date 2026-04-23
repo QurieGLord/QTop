@@ -3,13 +3,14 @@ package ui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	ColorText      = lipgloss.AdaptiveColor{Light: "0", Dark: "15"}
-	ColorMuted     = lipgloss.AdaptiveColor{Light: "8", Dark: "8"}
-	ColorAccent    = lipgloss.AdaptiveColor{Light: "6", Dark: "6"} // Cyan
-	ColorWarning   = lipgloss.AdaptiveColor{Light: "3", Dark: "3"} // Yellow
-	ColorCritical  = lipgloss.AdaptiveColor{Light: "1", Dark: "1"} // Red
-	ColorSuccess   = lipgloss.AdaptiveColor{Light: "2", Dark: "2"} // Green
-	ColorTitleText = lipgloss.AdaptiveColor{Light: "15", Dark: "15"}
+	ColorText       = lipgloss.AdaptiveColor{Light: "0", Dark: "15"}
+	ColorMuted      = lipgloss.AdaptiveColor{Light: "8", Dark: "8"}
+	ColorAccent     = lipgloss.AdaptiveColor{Light: "6", Dark: "6"} // Cyan
+	ColorAccentSoft = lipgloss.AdaptiveColor{Light: "4", Dark: "4"} // Blue
+	ColorWarning    = lipgloss.AdaptiveColor{Light: "3", Dark: "3"} // Yellow
+	ColorCritical   = lipgloss.AdaptiveColor{Light: "1", Dark: "1"} // Red
+	ColorSuccess    = lipgloss.AdaptiveColor{Light: "2", Dark: "2"} // Green
+	ColorTitleText  = lipgloss.AdaptiveColor{Light: "15", Dark: "15"}
 
 	BaseStyle   = lipgloss.NewStyle().Foreground(ColorText)
 	MutedStyle  = lipgloss.NewStyle().Foreground(ColorMuted)
@@ -26,6 +27,9 @@ var (
 	FocusedCardStyle = CardStyle.Copy().
 				BorderForeground(ColorAccent)
 
+	SoftCardStyle = CardStyle.Copy().
+			BorderForeground(ColorAccentSoft)
+
 	CardTitleStyle = lipgloss.NewStyle().
 			Foreground(ColorText).
 			Background(ColorMuted).
@@ -35,6 +39,12 @@ var (
 	FocusedCardTitleStyle = lipgloss.NewStyle().
 				Foreground(ColorTitleText).
 				Background(ColorAccent).
+				Bold(true).
+				Padding(0, 1)
+
+	SoftCardTitleStyle = lipgloss.NewStyle().
+				Foreground(ColorTitleText).
+				Background(ColorAccentSoft).
 				Bold(true).
 				Padding(0, 1)
 
@@ -56,9 +66,10 @@ var (
 
 // ComponentState holds the UI state for a component.
 type ComponentState struct {
-	Focused bool
-	Width   int
-	Height  int
+	Focused    bool
+	FocusLevel float64
+	Width      int
+	Height     int
 }
 
 // GetColorByPercent returns a color based on the load percentage.

@@ -23,6 +23,7 @@ type MemoryView struct {
 // Render returns the string representation of the MemoryView.
 func (m MemoryView) Render() string {
 	innerW, bodyH := cardContentSize(m.Width, m.Height)
+	density := densityForCard(innerW, bodyH)
 	color := GetColorByPercent(m.UsedPercent)
 	valueStyle := lipgloss.NewStyle().Foreground(color).Bold(true)
 	swapColor := GetColorByPercent(m.SwapUsedPercent)
@@ -37,10 +38,10 @@ func (m MemoryView) Render() string {
 			valueStyle,
 		))
 	}
-	if bodyH > 1 {
+	if density >= cardDensityCompact && bodyH > len(rows) {
 		rows = append(rows, ProgressBar(innerW, m.UsedPercent, color))
 	}
-	if bodyH > 2 {
+	if density >= cardDensityCozy && bodyH > len(rows) {
 		rows = append(rows, metricRow(
 			fmt.Sprintf("swap %s / %s", FormatBytes(m.SwapUsed), FormatBytes(m.SwapTotal)),
 			fmt.Sprintf("%5.1f%%", m.SwapUsedPercent),
@@ -48,12 +49,17 @@ func (m MemoryView) Render() string {
 			swapStyle,
 		))
 	}
-	if bodyH > 3 {
+	if density == cardDensityFull && bodyH > len(rows) {
 		rows = append(rows, ProgressBar(innerW, m.SwapUsedPercent, swapColor))
 	}
-	if graphH := bodyH - len(rows); graphH > 0 {
-		rows = append(rows, MultiLineGraph(m.History, innerW, graphH, color))
+	if density == cardDensityCozy && bodyH > len(rows) {
+		rows = append(rows, Sparkline(m.History, innerW, color))
+	}
+	if density == cardDensityFull {
+		if graphH := bodyH - len(rows); graphH > 0 {
+			rows = append(rows, MultiLineGraph(m.History, innerW, graphH, color))
+		}
 	}
 
-	return renderCard(m.Width, m.Height, "Memory", m.Focused, lipgloss.JoinVertical(lipgloss.Left, rows...))
+	return renderCard(m.Width, m.Height, "Memory", m.ComponentState, lipgloss.JoinVertical(lipgloss.Left, rows...))
 }

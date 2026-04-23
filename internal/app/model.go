@@ -15,11 +15,15 @@ import (
 )
 
 const tickInterval = time.Second
+const animationInterval = 80 * time.Millisecond
 const historyLimit = 60
 const layoutGap = 1
 const footerHeight = 2
+const animationStep = 0.35
+const focusAnimationStep = 0.28
 
 type tickMsg time.Time
+type animationMsg time.Time
 
 // fetchMsg contains the fetched statistics.
 type fetchMsg struct {
@@ -98,11 +102,21 @@ type Model struct {
 	cpuLoad float64
 	cpuHist []float64
 
+	cpuDisplayLoad float64
+	cpuDisplayHist []float64
+
 	memStat providers.MemoryStats
 	memHist []float64
 
+	memDisplayPercent  float64
+	swapDisplayPercent float64
+	memDisplayHist     []float64
+
 	gpus    []providers.GPUStats
 	gpuHist []float64
+
+	gpuDisplayLoad float64
+	gpuDisplayHist []float64
 
 	disks []providers.DiskStats
 
@@ -117,6 +131,7 @@ type Model struct {
 	windowHeight int
 	layout       layoutSpec
 	status       string
+	focusLevels  [focusCount]float64
 }
 
 // NewModel creates a new application model.
@@ -128,6 +143,7 @@ func NewModel() *Model {
 		diskProvider:    providers.NewDiskProvider(),
 		processProvider: providers.NewProcessProvider(),
 		focused:         focusCPU,
+		focusLevels:     [focusCount]float64{1, 0, 0, 0, 0},
 	}
 }
 
@@ -136,6 +152,7 @@ func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		tea.EnableMouseCellMotion,
 		m.tick(),
+		m.animate(),
 		m.fetchData(),
 	)
 }
@@ -203,19 +220,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clampProcessSelection()
 	case tickMsg:
 		return m, tea.Batch(m.tick(), m.fetchData())
+	case animationMsg:
+		m.advanceAnimations()
+		return m, m.animate()
 	case fetchMsg:
 		if msg.err != nil {
 			m.err = msg.err
 		} else {
 			m.cpuLoad = msg.cpuLoad
 			m.cpuHist = appendHist(m.cpuHist, m.cpuLoad)
+			if len(m.cpuDisplayHist) == 0 {
+				m.cpuDisplayLoad = m.cpuLoad
+				m.cpuDisplayHist = append([]float64(nil), m.cpuHist...)
+			}
 
 			m.memStat = msg.memStat
 			m.memHist = appendHist(m.memHist, m.memStat.UsedPercent)
+			if len(m.memDisplayHist) == 0 {
+				m.memDisplayPercent = m.memStat.UsedPercent
+				m.swapDisplayPercent = m.memStat.SwapUsedPercent
+				m.memDisplayHist = append([]float64(nil), m.memHist...)
+			}
 
 			m.gpus = msg.gpus
 			if len(m.gpus) > 0 {
 				m.gpuHist = appendHist(m.gpuHist, m.gpus[0].LoadPercent)
+				if len(m.gpuDisplayHist) == 0 {
+					m.gpuDisplayLoad = m.gpus[0].LoadPercent
+					m.gpuDisplayHist = append([]float64(nil), m.gpuHist...)
+				}
+			} else {
+				m.gpuHist = nil
+				m.gpuDisplayHist = nil
+				m.gpuDisplayLoad = 0
 			}
 
 			m.disks = msg.disks
@@ -264,31 +301,31 @@ func (m *Model) Layout(width, height int) string {
 	}
 
 	cpuView := ui.CPUView{
-		ComponentState: ui.ComponentState{Focused: m.focused == focusCPU, Width: m.layout.cpu.W, Height: m.layout.cpu.H},
-		LoadPercent:    m.cpuLoad,
-		History:        m.cpuHist,
+		ComponentState: ui.ComponentState{Focused: m.focused == focusCPU, FocusLevel: m.focusLevels[focusCPU], Width: m.layout.cpu.W, Height: m.layout.cpu.H},
+		LoadPercent:    m.cpuDisplayLoad,
+		History:        m.cpuDisplayHist,
 	}
 	gpuView := ui.GPUView{
-		ComponentState: ui.ComponentState{Focused: m.focused == focusGPU, Width: m.layout.gpu.W, Height: m.layout.gpu.H},
+		ComponentState: ui.ComponentState{Focused: m.focused == focusGPU, FocusLevel: m.focusLevels[focusGPU], Width: m.layout.gpu.W, Height: m.layout.gpu.H},
 		GPUs:           m.gpus,
-		History:        m.gpuHist,
+		History:        m.gpuDisplayHist,
 	}
 	memView := ui.MemoryView{
-		ComponentState:  ui.ComponentState{Focused: m.focused == focusRAM, Width: m.layout.ram.W, Height: m.layout.ram.H},
+		ComponentState:  ui.ComponentState{Focused: m.focused == focusRAM, FocusLevel: m.focusLevels[focusRAM], Width: m.layout.ram.W, Height: m.layout.ram.H},
 		Total:           m.memStat.Total,
 		Used:            m.memStat.Used,
-		UsedPercent:     m.memStat.UsedPercent,
+		UsedPercent:     m.memDisplayPercent,
 		SwapTotal:       m.memStat.SwapTotal,
 		SwapUsed:        m.memStat.SwapUsed,
-		SwapUsedPercent: m.memStat.SwapUsedPercent,
-		History:         m.memHist,
+		SwapUsedPercent: m.swapDisplayPercent,
+		History:         m.memDisplayHist,
 	}
 	diskView := ui.DiskView{
-		ComponentState: ui.ComponentState{Focused: m.focused == focusDisk, Width: m.layout.disk.W, Height: m.layout.disk.H},
+		ComponentState: ui.ComponentState{Focused: m.focused == focusDisk, FocusLevel: m.focusLevels[focusDisk], Width: m.layout.disk.W, Height: m.layout.disk.H},
 		Disks:          m.disks,
 	}
 	procView := ui.ProcessView{
-		ComponentState: ui.ComponentState{Focused: m.focused == focusProcess, Width: m.layout.proc.W, Height: m.layout.proc.H},
+		ComponentState: ui.ComponentState{Focused: m.focused == focusProcess, FocusLevel: m.focusLevels[focusProcess], Width: m.layout.proc.W, Height: m.layout.proc.H},
 		Processes:      m.procs,
 		Scroll:         m.procScroll,
 		Selected:       m.selectedProcIdx,
@@ -297,9 +334,9 @@ func (m *Model) Layout(width, height int) string {
 	var grid string
 	switch m.layout.mode {
 	case layoutWide:
-		leftColumn := joinVerticalGap(layoutGap, cpuView.Render(), gpuView.Render())
-		rightColumn := joinVerticalGap(layoutGap, memView.Render(), diskView.Render(), procView.Render())
-		grid = joinHorizontalGap(layoutGap, leftColumn, rightColumn)
+		topRow := joinHorizontalGap(layoutGap, cpuView.Render(), gpuView.Render())
+		midRow := joinHorizontalGap(layoutGap, memView.Render(), diskView.Render())
+		grid = joinVerticalGap(layoutGap, topRow, midRow, procView.Render())
 	default:
 		grid = joinVerticalGap(layoutGap, cpuView.Render(), gpuView.Render(), memView.Render(), diskView.Render(), procView.Render())
 	}
@@ -312,6 +349,12 @@ func (m *Model) Layout(width, height int) string {
 func (m *Model) tick() tea.Cmd {
 	return tea.Tick(tickInterval, func(t time.Time) tea.Msg {
 		return tickMsg(t)
+	})
+}
+
+func (m *Model) animate() tea.Cmd {
+	return tea.Tick(animationInterval, func(t time.Time) tea.Msg {
+		return animationMsg(t)
 	})
 }
 
@@ -429,14 +472,14 @@ func (m *Model) signalSelectedProcess(sig syscall.Signal) string {
 
 func (m *Model) compactView(width, height int) string {
 	lines := []string{
-		fmt.Sprintf("CPU  %5.1f%%", m.cpuLoad),
-		fmt.Sprintf("RAM  %5.1f%%  %s / %s", m.memStat.UsedPercent, ui.FormatBytes(m.memStat.Used), ui.FormatBytes(m.memStat.Total)),
+		fmt.Sprintf("CPU  %5.1f%%", m.cpuDisplayLoad),
+		fmt.Sprintf("RAM  %5.1f%%  %s / %s", m.memDisplayPercent, ui.FormatBytes(m.memStat.Used), ui.FormatBytes(m.memStat.Total)),
 	}
 	if len(m.disks) > 0 {
 		lines = append(lines, fmt.Sprintf("DSK  %s %5.1f%%", m.disks[0].MountPoint, m.disks[0].UsedPercent))
 	}
 	if len(m.gpus) > 0 {
-		lines = append(lines, fmt.Sprintf("GPU  %5.1f%%", m.gpus[0].LoadPercent))
+		lines = append(lines, fmt.Sprintf("GPU  %5.1f%%", m.gpuDisplayLoad))
 	}
 	lines = append(lines, "Resize terminal for full dashboard")
 
@@ -455,7 +498,7 @@ func calculateLayout(width, height, diskCount int) layoutSpec {
 		return layoutSpec{mode: layoutCompact}
 	}
 
-	if width < 110 {
+	if width < 72 {
 		diskHeight := minInt(ui.DiskHeight(diskCount), maxInt(5, height/3))
 		remaining := maxInt(10, height-diskHeight-layoutGap)
 		heights := splitWeighted(remaining, layoutGap, 2, 2, 3, 6)
@@ -475,19 +518,20 @@ func calculateLayout(width, height, diskCount int) layoutSpec {
 		return spec
 	}
 
-	widths := splitWeighted(width, layoutGap, 11, 13)
-	leftHeights := splitWeighted(height, layoutGap, 1, 1)
-	diskHeight := minInt(ui.DiskHeight(diskCount), maxInt(5, height/3))
-	rightRemaining := maxInt(8, height-diskHeight-layoutGap)
-	rightHeights := splitWeighted(rightRemaining, layoutGap, 2, 5)
+	widths := splitWeighted(width, layoutGap, 1, 1)
+	secondRowHeight := minInt(maxInt(ui.DiskHeight(diskCount), 6), maxInt(6, height/3))
+	remaining := maxInt(10, height-secondRowHeight-layoutGap)
+	rowHeights := splitWeighted(remaining, layoutGap, 2, 5)
+	firstRowHeight := rowHeights[0]
+	procHeight := rowHeights[1]
 
 	return layoutSpec{
 		mode: layoutWide,
-		cpu:  panelRect{X: 0, Y: 0, W: widths[0], H: leftHeights[0]},
-		gpu:  panelRect{X: 0, Y: leftHeights[0] + layoutGap, W: widths[0], H: leftHeights[1]},
-		ram:  panelRect{X: widths[0] + layoutGap, Y: 0, W: widths[1], H: rightHeights[0]},
-		disk: panelRect{X: widths[0] + layoutGap, Y: rightHeights[0] + layoutGap, W: widths[1], H: diskHeight},
-		proc: panelRect{X: widths[0] + layoutGap, Y: rightHeights[0] + diskHeight + (layoutGap * 2), W: widths[1], H: maxInt(1, height-rightHeights[0]-diskHeight-(layoutGap*2))},
+		cpu:  panelRect{X: 0, Y: 0, W: widths[0], H: firstRowHeight},
+		gpu:  panelRect{X: widths[0] + layoutGap, Y: 0, W: widths[1], H: firstRowHeight},
+		ram:  panelRect{X: 0, Y: firstRowHeight + layoutGap, W: widths[0], H: secondRowHeight},
+		disk: panelRect{X: widths[0] + layoutGap, Y: firstRowHeight + layoutGap, W: widths[1], H: secondRowHeight},
+		proc: panelRect{X: 0, Y: firstRowHeight + secondRowHeight + (layoutGap * 2), W: width, H: procHeight},
 	}
 }
 
@@ -645,4 +689,74 @@ func (m *Model) focusLabel() string {
 	default:
 		return "CPU"
 	}
+}
+
+func (m *Model) advanceAnimations() {
+	for i := range m.focusLevels {
+		target := 0.0
+		if focusPanel(i) == m.focused {
+			target = 1.0
+		}
+		m.focusLevels[i] = easeTowards(m.focusLevels[i], target, focusAnimationStep)
+	}
+
+	m.cpuDisplayLoad = easeTowards(m.cpuDisplayLoad, m.cpuLoad, animationStep)
+	m.memDisplayPercent = easeTowards(m.memDisplayPercent, m.memStat.UsedPercent, animationStep)
+	m.swapDisplayPercent = easeTowards(m.swapDisplayPercent, m.memStat.SwapUsedPercent, animationStep)
+
+	if len(m.gpus) > 0 {
+		m.gpuDisplayLoad = easeTowards(m.gpuDisplayLoad, m.gpus[0].LoadPercent, animationStep)
+	} else {
+		m.gpuDisplayLoad = easeTowards(m.gpuDisplayLoad, 0, animationStep)
+	}
+
+	m.cpuDisplayHist = animateHistory(m.cpuDisplayHist, m.cpuHist, animationStep)
+	m.memDisplayHist = animateHistory(m.memDisplayHist, m.memHist, animationStep)
+	m.gpuDisplayHist = animateHistory(m.gpuDisplayHist, m.gpuHist, animationStep)
+}
+
+func easeTowards(current, target, step float64) float64 {
+	if current == 0 && target == 0 {
+		return 0
+	}
+	next := current + (target-current)*step
+	if absFloat(target-next) < 0.05 {
+		return target
+	}
+	return next
+}
+
+func animateHistory(current, target []float64, step float64) []float64 {
+	if len(target) == 0 {
+		return nil
+	}
+
+	if len(current) == 0 {
+		return append([]float64(nil), target...)
+	}
+
+	if len(current) < len(target) {
+		pad := make([]float64, len(target)-len(current))
+		fill := current[len(current)-1]
+		for i := range pad {
+			pad[i] = fill
+		}
+		current = append(current, pad...)
+	} else if len(current) > len(target) {
+		current = current[len(current)-len(target):]
+	}
+
+	animated := make([]float64, len(target))
+	for i := range target {
+		animated[i] = easeTowards(current[i], target[i], step)
+	}
+
+	return animated
+}
+
+func absFloat(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
