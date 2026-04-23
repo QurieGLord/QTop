@@ -35,8 +35,14 @@ To build QTop from source, you need **Go 1.21** or higher installed on your syst
 Select your distribution below to see the required commands:
 
 <details>
-<summary><b>Arch Linux (pacman)</b></summary>
+<summary><b>Arch Linux (pacman / AUR)</b></summary>
 
+**Option 1: Official AUR (Recommended)**
+```bash
+yay -S qtop
+```
+
+**Option 2: Manual build**
 ```bash
 sudo pacman -S go base-devel
 ```
